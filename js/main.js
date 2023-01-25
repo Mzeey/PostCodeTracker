@@ -28,22 +28,7 @@ function initMap() {
 	//Initialize map
 	map = new google.maps.Map(document.getElementById("map"), mapOptions);
 
-	//Funciton adds marker to map
-	function addMarker(props) {
-		var marker = new google.maps.Marker({
-			position: props.coords,
-			map: map,
-		});
-		if (props.iconImg) {
-			marker.setIcon(props.iconImg);
-		}
-
-		if (props.content) {
-			var infowindow = new google.maps.InfoWindow({
-				content: props.content,
-			});
-		}
-	}
+	
 
 	//implement autocomplete function
 	let autocomplete = new google.maps.places.Autocomplete(UserPostCode);
@@ -53,7 +38,6 @@ function initMap() {
 		resetValues();
 		findClosestPostCode().then(() => {
 			renderClosestPostCodes();
-			console.log("HI");
 		});
 	});
 
@@ -73,12 +57,6 @@ function initMap() {
 							new Promise((resolve, reject) => {
 								geocoder.geocode({ address: postcode }, async function (results, status) {
 									if (status == "OK") {
-										let marker = new google.maps.Marker({
-											position: results[0].geometry.location,
-											map: map,
-											title: postcode,
-										});
-										await savedPostCodesMarkers.push(marker);
 										await distanceMatrixservice.getDistanceMatrix(
 											{
 												origins: [customerLatLng],
@@ -113,6 +91,28 @@ function initMap() {
 	}
 }
 
+//Funciton adds marker to map
+function addMarker(props) {
+	var marker = new google.maps.Marker({
+		position: props.coords,
+		map: map,
+	});
+	if (props.iconImg) {
+		marker.setIcon(props.iconImg);
+	}
+
+	if(props.title){
+		marker.setTitle(props.title);
+	}
+
+	if (props.content) {
+		var infowindow = new google.maps.InfoWindow({
+			content: props.content,
+		});
+	}
+	
+}
+
 function renderClosestPostCodes() {
 	if (savedPostCodes.length == closest.length) {
 		closest.sort(function (a, b) {
@@ -137,9 +137,12 @@ function displayPostcode(closest) {
 	let content = "";
 
 	closest.forEach(function (item, index) {
-		if (index > 10) {
+		if (index > 9) {
 			return;
 		}
+
+		addMarker({coords: item.latLng, title: item.postcode, })
+
 		content += `
             <li id="${index + 1}"> 
                 <p>Post Code: ${item.postcode}</p>
