@@ -7,14 +7,33 @@
     , initial-scale=1.0">
     <!-- <script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script> -->
     <link rel="stylesheet" href="css/styles.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css">
     <title>Post Code Tracker</title>
 </head>
 <body>
     <div class="wrapper">
-        <form id="search" action="">
-            <input type="text" id="postcode" placeholder="Enter your post code">
-            <input type="submit" value="Submit">
-        </form>
+        <div class="left-content">
+            <form id="search" action="">
+                <div class="head-content">
+                    <h1>Find a WSF branch </h1>
+                    <p>search by address or postcode</p>
+                </div>
+                <div class="form-inputs">
+                    <input type="text" id="postcode" placeholder="Enter your post code">
+                    <button class="btn" type="submit"><i class="fa fa-search" aria-hidden="true"></i></button>
+                </div>
+                
+            </form>
+
+            <p class="desc"></p>
+
+            <hr>
+
+            <ul class="postcode-list">
+                
+            </ul>
+        </div>
+        
     
         <div class="map" id="map">
             

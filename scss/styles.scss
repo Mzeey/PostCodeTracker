@@ -14,15 +14,60 @@ html, body{
 }
 .wrapper{
     display: flex;
-    flex-direction: column;
     width: 100%;
     height: 100%;
 }
 
 .map{
-    width: 100%;
-    height: 500px;
+    width: 50%;
+    height: 100%;
     margin: 0;
     padding: 0;
-    background: blue;
+}
+
+.left-content{
+    width: 50%;
+    padding: 2.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.4rem;
+    form{
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 4rem;
+
+        .form-inputs{
+            border: 1px solid #e8e8e8;
+            display: flex;
+        }
+    }
+}
+
+.btn{
+    background-color: rgb(127, 127, 192);
+    padding: 0.8rem;
+    min-width: 20%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: none;
+    outline: none;
+    border-radius: none;
+    &:hover{
+        cursor: pointer;
+        border: 1px solid rgb(58, 58, 104);
+    }
+}
+
+input[type=text]{
+    padding: 0.8rem;
+    width: 80%;
+    border: none;
+    &:focus{
+        outline: none;
+    }
+    &:focus > div{
+        border: 1px solid  rgb(58, 58, 104);
+    }
 }
