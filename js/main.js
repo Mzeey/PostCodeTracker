@@ -1,10 +1,18 @@
+// const { kdTree } = require("./kd-tree");
+
+
 let savedPostCodes = [];
 
 async function getSavedPostCodes() {
-	fetch("../PostCodes.json")
+	fetch("../Places.json")
 		.then((response) => response.json())
 		.then(async function (data) {
-			savedPostCodes = await data.SavedPostcodes;
+			savedPostCodes = await data;
+			savedPostCodes.forEach((item) => {
+				item = new PlaceLocation(item.postcode, item.lat, item.lng);
+				places.push(item);
+			})
+			console.log(places[0]);
 		});
 }
 getSavedPostCodes();
@@ -12,9 +20,12 @@ getSavedPostCodes();
 let UserPostCode = document.querySelector("#postcode");
 let savedPostCodesMarkers = [];
 let customerLatLng = null;
+let customerMarker = null;
 let closest = [];
+let places = [];
 let map = null;
 const TOMILES = 1609.344;
+const FROMCARTESIANTOMILES = 0.000621371;
 
 function initMap() {
 	var position = { lat: 53.453, lng: -2.0268 };
@@ -39,46 +50,64 @@ function initMap() {
 		findClosestPostCode().then(() => {
 			renderClosestPostCodes();
 		});
+		// getLatLngOfSavedPlaces();
 	});
+	
+	function getLatLngOfSavedPlaces(){
+		let promises = [];
+		savedPostCodes.forEach(function(item){
+			promises.push(new Promise((resolve) =>{
+				geocoder.geocode({address: item}, async function (results, status){
+					if(status == google.maps.GeocoderStatus.OK){
+						places.push({postcode: item, lat : results[0].geometry.location.lat(), Lng: results[0].geometry.location.lng()});
+						resolve();
+					}
+				})
+			}));
+		});
+		Promise.all(promises).then(() => {
+			// let jsonObject = JSON.parse(places);
+			console.log(JSON.stringify(places));
+			console.log(places)
+		});
+	}
 
 	function findClosestPostCode() {
 		return new Promise((resolve) => {
 			let postcode = UserPostCode.value;
 			geocoder.geocode({ address: postcode }, function (results, status) {
-				if (status == "OK") {
+				if (status == google.maps.GeocoderStatus.OK) {
 					customerLatLng = results[0].geometry.location;
-					addMarker({ coords: customerLatLng });
-					map.setCenter(customerLatLng);
-					map.setZoom(16);
+					let CustomerLocation = new PlaceLocation(postcode, customerLatLng.lat(), customerLatLng.lng());
+					// customerMarker =  addMarker({ coords: customerLatLng });
+					// map.setCenter(customerLatLng);
+					map.setZoom(14);
 
+					let tree = new kdTree(places, (a,b) => calculateDistanceInMiles(a,b), ["Latitude", "Longitude"])
+
+					let closestLocations = tree.nearest({Latitude:CustomerLocation.Latitude, Longitude: CustomerLocation.Longitude}, 10)
+					console.log(closestLocations)
+					closestLocations.forEach((location) =>{
+						location[0].DistanceInMiles = calculateDistanceInMiles(CustomerLocation, location[0])
+					})
+					closestLocations.sort((a,b) => a[1] - b[1]);
+					console.log(closestLocations);
+					
 					let promises = [];
-					savedPostCodes.forEach(function (postcode) {
+					savedPostCodes.forEach(function (place) {
 						promises.push(
-							new Promise((resolve, reject) => {
-								geocoder.geocode({ address: postcode }, async function (results, status) {
-									if (status == "OK") {
-										await distanceMatrixservice.getDistanceMatrix(
-											{
-												origins: [customerLatLng],
-												destinations: [results[0].geometry.location],
-												travelMode: "DRIVING",
-											},
-											async (response, status) => {
-												if (status == "OK") {
-													let distance = await response.rows[0].elements[0].distance.value;
-													closest.push(
-														await {
-															postcode: postcode,
-															distance: distance,
-															latLng: results[0].geometry.location,
-														}
-													);
-													resolve();
-												}
-											}
-										);
+							new Promise(async (resolve) => {
+								let placeLatLng = new google.maps.LatLng(place.lat, place.lng);
+								let distance = google.maps.geometry.spherical.computeDistanceBetween(customerLatLng, placeLatLng);
+
+								closest.push(
+									await {
+										postcode: place.postcode,
+										distance: distance,
+										latLng: placeLatLng
 									}
-								});
+								)
+								resolve();
 							})
 						);
 					});
@@ -110,6 +139,8 @@ function addMarker(props) {
 			content: props.content,
 		});
 	}
+
+	return marker;
 	
 }
 
@@ -129,6 +160,13 @@ function renderClosestPostCodes() {
 function resetValues() {
 	document.querySelector(".postcode-list").innherHTML = "";
 	closest = [];
+	console.log(savedPostCodesMarkers)
+	savedPostCodesMarkers.forEach(function(item){
+		item.setMap(null);
+	});
+	if(customerMarker){
+		customerMarker.setMap(null);
+	}
 	savedPostCodesMarkers = [];
 }
 
@@ -141,7 +179,7 @@ function displayPostcode(closest) {
 			return;
 		}
 
-		addMarker({coords: item.latLng, title: item.postcode, })
+		savedPostCodesMarkers.push(addMarker({coords: item.latLng, title: item.postcode, }))
 
 		content += `
             <li id="${index + 1}"> 
@@ -179,4 +217,56 @@ function clearBounce(itemMarker) {
 	if (itemMarker.getAnimation() == google.maps.Animation.BOUNCE) {
 		itemMarker.setAnimation(null);
 	}
+}
+
+
+function distanceInMiles(lat1, lon1, lat2, lon2) {
+    var R = 3959; // radius of Earth in miles
+    var radlat1 = Math.PI * lat1/180
+    var radlat2 = Math.PI * lat2/180
+    var theta = lon1-lon2
+    var radtheta = Math.PI * theta/180
+    var dist = Math.sin(radlat1) * Math.sin(radlat2) + Math.cos(radlat1) * Math.cos(radlat2) * Math.cos(radtheta);
+    dist = Math.acos(dist)
+    dist = dist * 180/Math.PI
+    dist = dist * 60 * 1.1515
+    return dist
+}
+// Code refactoring begins here
+
+class PlaceLocation{
+	constructor(title, latitude, longitude){
+		this.Title = title;
+		this.Latitude = latitude;
+		this.Longitude = longitude
+	}
+
+	setMarker(marker){
+		this.Marker = marker;
+	}
+	
+	clearMarker(){
+		this.Marker.setMap(null);
+		this.Marker = null;
+	}
+}
+
+
+function calculateDistanceInMiles(Origin = new PlaceLocation(), Destination = new PlaceLocation()){
+	const EARTHRADIUSINMILES = 3959;
+	let originRadiusLat = Math.PI * Origin.Latitude/180;
+	let destinationRadiusLat = Math.PI * Destination.Latitude/180;
+	let theta = Origin.Longitude - Destination.Longitude;
+	let radiusTheta = Math.PI * theta/180;
+	let distance = Math.sin(originRadiusLat) * Math.sin(destinationRadiusLat) + Math.cos(originRadiusLat) * Math.cos(destinationRadiusLat) * Math.cos(radiusTheta);
+	distance = Math.acos(distance);
+	distance = distance * 180/Math.PI;
+	distance = distance * 60 * 1.1515;
+	return distance;
+}
+
+
+function redirectToGoogleMaps(Origin, Destination) {
+  const url = `https://www.google.com/maps?saddr=${Origin.Latitude},${Origin.Longitude}&daddr=${Destination.Latitude},${Destination.Longitude}`;
+  window.location.href = url;
 }
