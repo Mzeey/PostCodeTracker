@@ -12,7 +12,6 @@ async function getSavedPostCodes() {
 				item = new PlaceLocation(item.postcode, item.lat, item.lng);
 				places.push(item);
 			})
-			console.log(places[0]);
 		});
 }
 getSavedPostCodes();
@@ -21,8 +20,9 @@ let UserPostCode = document.querySelector("#postcode");
 let savedPostCodesMarkers = [];
 let customerLatLng = null;
 let customerMarker = null;
-let closest = [];
+let closestLocations = [];
 let places = [];
+let CustomerLocation = null;
 let map = null;
 const TOMILES = 1609.344;
 const FROMCARTESIANTOMILES = 0.000621371;
@@ -47,12 +47,10 @@ function initMap() {
 	document.querySelector("#search").addEventListener("submit", function (e) {
 		e.preventDefault();
 		resetValues();
-		findClosestPostCode().then(() => {
-			renderClosestPostCodes();
-		});
-		// getLatLngOfSavedPlaces();
+		findClosestPostCode();
 	});
-	
+
+	//this function gets the latitude and longitudinal values of the Places using google map
 	function getLatLngOfSavedPlaces(){
 		let promises = [];
 		savedPostCodes.forEach(function(item){
@@ -78,42 +76,18 @@ function initMap() {
 			geocoder.geocode({ address: postcode }, function (results, status) {
 				if (status == google.maps.GeocoderStatus.OK) {
 					customerLatLng = results[0].geometry.location;
-					let CustomerLocation = new PlaceLocation(postcode, customerLatLng.lat(), customerLatLng.lng());
-					// customerMarker =  addMarker({ coords: customerLatLng });
-					// map.setCenter(customerLatLng);
-					map.setZoom(14);
+					CustomerLocation = new PlaceLocation(postcode, customerLatLng.lat(), customerLatLng.lng());
+					// map.setZoom(14);
 
 					let tree = new kdTree(places, (a,b) => calculateDistanceInMiles(a,b), ["Latitude", "Longitude"])
 
-					let closestLocations = tree.nearest({Latitude:CustomerLocation.Latitude, Longitude: CustomerLocation.Longitude}, 10)
+					closestLocations = tree.nearest({Latitude:CustomerLocation.Latitude, Longitude: CustomerLocation.Longitude}, 10)
 					console.log(closestLocations)
 					closestLocations.forEach((location) =>{
-						location[0].DistanceInMiles = calculateDistanceInMiles(CustomerLocation, location[0])
+						location[0].DistanceInMiles = calculateDistanceInMiles(CustomerLocation, location[0]).toFixed(2);
 					})
 					closestLocations.sort((a,b) => a[1] - b[1]);
-					console.log(closestLocations);
-					
-					let promises = [];
-					savedPostCodes.forEach(function (place) {
-						promises.push(
-							new Promise(async (resolve) => {
-								let placeLatLng = new google.maps.LatLng(place.lat, place.lng);
-								let distance = google.maps.geometry.spherical.computeDistanceBetween(customerLatLng, placeLatLng);
-
-								closest.push(
-									await {
-										postcode: place.postcode,
-										distance: distance,
-										latLng: placeLatLng
-									}
-								)
-								resolve();
-							})
-						);
-					});
-					Promise.all(promises).then(() => {
-						resolve();
-					});
+					renderClosetLocations(closestLocations, CustomerLocation);
 				}
 			});
 		});
@@ -144,6 +118,33 @@ function addMarker(props) {
 	
 }
 
+function renderClosetLocations(closestLocations, CustomerLocation){
+	let ClosetLocation = closestLocations[0][0];
+	renderPlacesHTML(closestLocations);
+	document.querySelector(".desc").innerHTML = `${ClosetLocation.Title} is the closest to ${CustomerLocation.Title} with a distance of ${ClosetLocation.DistanceInMiles} miles`;
+}
+
+function renderPlacesHTML(closestLocations){
+	let postcodeList = document.querySelector(".postcode-list");
+	let content = "";
+	closestLocations.forEach(function(item, index){
+		item = item[0];
+		let itemCoords = new google.maps.LatLng(item.Latitude, item.Longitude);
+		item.Marker = addMarker({coords: itemCoords, title: item.Title});
+		let googleMapRedirectLink = getRedirectToGoogleMapsLink(CustomerLocation, item)
+		content += `
+		<li id="${index + 1}"> 
+			<p>Post Code: ${item.Title}</p>
+			<p>Distance: ${item.DistanceInMiles} miles</p>
+			<a href="${googleMapRedirectLink}" target="_blank"> View Direction</a>
+		</li>
+	`;
+	});
+	postcodeList.innerHTML = content;
+	applyListeners(closestLocations);
+	fitBoundsToMap(closestLocations);
+}
+
 function renderClosestPostCodes() {
 	if (savedPostCodes.length == closest.length) {
 		closest.sort(function (a, b) {
@@ -152,56 +153,36 @@ function renderClosestPostCodes() {
 		let closestdistance = (closest[0].distance / TOMILES).toFixed(2);
 		let closestPostcode = closest[0].postcode;
 		displayPostcode(closest);
-
-		document.querySelector(".desc").innerHTML = `${closestPostcode} is the closest to ${UserPostCode.value} with a distance of ${closestdistance} miles`;
 	}
 }
 
+//refactor this
 function resetValues() {
 	document.querySelector(".postcode-list").innherHTML = "";
-	closest = [];
-	console.log(savedPostCodesMarkers)
-	savedPostCodesMarkers.forEach(function(item){
-		item.setMap(null);
-	});
+	if(closestLocations){
+		closestLocations.forEach(function(item){
+			item = item[0];
+			item.Marker.setMap(null);
+		})
+		closestLocations = [];
+	}
 	if(customerMarker){
 		customerMarker.setMap(null);
 	}
-	savedPostCodesMarkers = [];
 }
 
-function displayPostcode(closest) {
-	let postcodeList = document.querySelector(".postcode-list");
-	let content = "";
 
-	closest.forEach(function (item, index) {
-		if (index > 9) {
-			return;
-		}
-
-		savedPostCodesMarkers.push(addMarker({coords: item.latLng, title: item.postcode, }))
-
-		content += `
-            <li id="${index + 1}"> 
-                <p>Post Code: ${item.postcode}</p>
-                <p>Distance: ${(item.distance / TOMILES).toFixed(2)} miles</p>
-            </li>
-        `;
-	});
-	postcodeList.innerHTML = content;
-	applyListeners();
-}
-
-function applyListeners() {
+function applyListeners(closestLocations) {
 	let descListItems = document.querySelectorAll(".postcode-list li");
 	for (let i = 0; i < descListItems.length; i++) {
 		descListItems[i].addEventListener("click", function () {
 			let itemIndex = this.id - 1;
-			let itemMarker = savedPostCodesMarkers[itemIndex];
-			savedPostCodesMarkers.forEach(function (item) {
-				clearBounce(item);
-			});
-			toogleBounce(itemMarker);
+			console.log(closestLocations[itemIndex][0], itemIndex);
+			closestLocations.forEach(function(item){
+				item = item[0];
+				clearBounce(item.Marker);
+			})
+			toogleBounce(closestLocations[itemIndex][0].Marker)
 		});
 	}
 }
@@ -232,7 +213,7 @@ function distanceInMiles(lat1, lon1, lat2, lon2) {
     dist = dist * 60 * 1.1515
     return dist
 }
-// Code refactoring begins here
+
 
 class PlaceLocation{
 	constructor(title, latitude, longitude){
@@ -265,8 +246,17 @@ function calculateDistanceInMiles(Origin = new PlaceLocation(), Destination = ne
 	return distance;
 }
 
+function fitBoundsToMap(closestLocations){
+	var bounds = new google.maps.LatLngBounds();
+	closestLocations.forEach(function(item){
+		item = item[0];
+		bounds.extend(item.Marker.getPosition());
+	})
+	map.fitBounds(bounds);
+}
 
-function redirectToGoogleMaps(Origin, Destination) {
+
+function getRedirectToGoogleMapsLink(Origin, Destination) {
   const url = `https://www.google.com/maps?saddr=${Origin.Latitude},${Origin.Longitude}&daddr=${Destination.Latitude},${Destination.Longitude}`;
-  window.location.href = url;
+  return url
 }
