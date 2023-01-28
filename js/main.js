@@ -89,8 +89,15 @@ function initMap() {
 					})
 					closestLocations.sort((a,b) => a[1] - b[1]);
 					renderClosetLocations(closestLocations, CustomerLocation);
+				}else{
+					Swal.fire(
+						"Error",
+						"Please Input a Valid destination",
+						"error"
+					)
 				}
 			});
+			
 		});
 	}
 }
