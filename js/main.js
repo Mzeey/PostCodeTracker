@@ -26,6 +26,7 @@ let CustomerLocation = null;
 let map = null;
 const TOMILES = 1609.344;
 const FROMCARTESIANTOMILES = 0.000621371;
+const iconBase = "../images/svg/";
 
 function initMap() {
 	var position = { lat: 53.453, lng: -2.0268 };
@@ -98,10 +99,13 @@ function initMap() {
 function addMarker(props) {
 	var marker = new google.maps.Marker({
 		position: props.coords,
-		map: map,
+		map: map
 	});
 	if (props.iconImg) {
-		marker.setIcon(props.iconImg);
+		marker.setIcon(
+			new google.maps.MarkerImage(props.iconImg, null, null, null, 
+				new google.maps.Size(36, 46.69))
+			);
 	}
 
 	if(props.title){
@@ -112,6 +116,10 @@ function addMarker(props) {
 		var infowindow = new google.maps.InfoWindow({
 			content: props.content,
 		});
+	}
+
+	if(props.label){
+		marker.setLabel(props.label)
 	}
 
 	return marker;
@@ -130,13 +138,25 @@ function renderPlacesHTML(closestLocations){
 	closestLocations.forEach(function(item, index){
 		item = item[0];
 		let itemCoords = new google.maps.LatLng(item.Latitude, item.Longitude);
-		item.Marker = addMarker({coords: itemCoords, title: item.Title});
+		item.Marker = addMarker({coords: itemCoords, title: item.Title, iconImg: `${iconBase}marker${index+1}.svg`});
 		let googleMapRedirectLink = getRedirectToGoogleMapsLink(CustomerLocation, item)
 		content += `
-		<li id="${index + 1}"> 
-			<p>Post Code: ${item.Title}</p>
-			<p>Distance: ${item.DistanceInMiles} miles</p>
-			<a href="${googleMapRedirectLink}" target="_blank"> View Direction</a>
+		<li class="location" id="${index + 1}">
+			<div class="left">
+				<p class="label-counter">${index + 1}</p>
+			</div>
+			<div class="right">
+				<div class="head-content">
+					<p class="head-txt">${item.Title}</p>
+					<p class="distance">
+					${item.DistanceInMiles} miles
+					</p>
+				</div>
+				<a class="direction" href="${googleMapRedirectLink}" target="_blank">
+					Get directions <i class="fa-solid fa-arrow-right"></i>
+				</a>
+				
+			</div>
 		</li>
 	`;
 	});
@@ -156,7 +176,6 @@ function renderClosestPostCodes() {
 	}
 }
 
-//refactor this
 function resetValues() {
 	document.querySelector(".postcode-list").innherHTML = "";
 	if(closestLocations){
@@ -175,7 +194,10 @@ function resetValues() {
 function applyListeners(closestLocations) {
 	let descListItems = document.querySelectorAll(".postcode-list li");
 	for (let i = 0; i < descListItems.length; i++) {
-		descListItems[i].addEventListener("click", function () {
+		descListItems[i].addEventListener("click", function (e) {
+			deselectAll(descListItems);
+			this.classList.toggle("selected");
+			console.log(this)
 			let itemIndex = this.id - 1;
 			console.log(closestLocations[itemIndex][0], itemIndex);
 			closestLocations.forEach(function(item){
@@ -185,6 +207,14 @@ function applyListeners(closestLocations) {
 			toogleBounce(closestLocations[itemIndex][0].Marker)
 		});
 	}
+}
+
+function deselectAll(descListItems){
+	descListItems.forEach(function(item){
+		if(item.classList.contains("selected")){
+			item.classList.remove("selected");
+		}
+	});
 }
 function toogleBounce(itemMarker) {
 	if (itemMarker.getAnimation() != google.maps.Animation.BOUNCE) {
