@@ -4,7 +4,7 @@
 let savedPostCodes = [];
 
 async function getSavedPostCodes() {
-	fetch("../Places.json")
+	fetch("/Places.json")
 		.then((response) => response.json())
 		.then(async function (data) {
 			savedPostCodes = await data;
@@ -26,7 +26,7 @@ let CustomerLocation = null;
 let map = null;
 const TOMILES = 1609.344;
 const FROMCARTESIANTOMILES = 0.000621371;
-const iconBase = "../images/svg/";
+const iconBase = "/images/svg/";
 
 function initMap() {
 	var position = { lat: 53.453, lng: -2.0268 };
